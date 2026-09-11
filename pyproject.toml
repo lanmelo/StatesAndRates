@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "statesandrates"
+authors = [
+    { name = "Lucas A. N. Melo", email = "lanmelo@stanford.edu" },
+]
+description = "Graphs of states connected by rates, and analyses of them"
+requires-python = ">=3.12"
+dynamic = ["version"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Intended Audience :: Science/Research",
+]
+dependencies = [
+    "jax",
+    "numpy",
+    "scipy",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+driven = ["diffrax"]
+graph = ["networkx"]
+docs = ["diffrax", "jupyter", "networkx", "optimistix"]
+
+[tool.setuptools.dynamic]
+version = { attr = "statesandrates.__version__" }
+
+[tool.isort]
+profile = "black"
+line_length = 79
+skip_gitignore = true
+
+[tool.black]
+line-length = 79
+target-version = ['py312']
+skip_magic_trailing_comma = true
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = true
+warn_unreachable = true
+enable_error_code = [
+    "explicit-override",
+    "redundant-expr",
+    "truthy-bool",
+    "truthy-iterable",
+    "ignore-without-code",
+    "redundant-self",
+]
+
+[tool.pylint.main]
+jobs = 0
+
+[tool.pylint.basic]
+variable-rgx = "^[a-z][a-zA-Z0-9_]*$"
+
+[tool.pylint.format]
+max-line-length = 79
+
+[tool.pylint."messages control"]
+disable = [
+    "cyclic-import",
+    "duplicate-code",
+    "import-error",
+    "import-outside-toplevel",
+    "too-many-arguments",
+    "too-many-locals",
+    "too-many-positional-arguments",
+    "wrong-import-position",
+]
+enable = [
+    "deprecated-pragma",
+    "useless-suppression",
+    "use-symbolic-message-instead",
+    "bad-inline-option",
+]

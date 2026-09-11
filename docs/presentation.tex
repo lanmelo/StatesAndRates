@@ -1,0 +1,1007 @@
+\documentclass[10pt,aspectratio=169]{beamer}
+
+\usetheme{Singapore}
+\setbeamertemplate{navigation symbols}{}
+
+% Singapore's miniframes headline already shows the sections in colour and
+% a dot per slide within each. All that is added here is a progress bar for
+% position in the whole deck, and the frame number.
+% the inactive sections are very faint by default; lift them enough to be
+% read as "still to come" rather than as decoration
+\setbeamercolor{section in head/foot}{fg=structure}
+\setbeamercolor{section in head/foot shaded}{fg=black!45}
+% Both arrows in one place, since a plain frame suppresses the footline
+% and has to place them by hand.
+\newcommand{\navcluster}{%
+  \scriptsize
+  \hyperlinkslideprev{\color{structure}\textless}\hspace{1.6ex}%
+  \hyperlinkslidenext{\color{structure}\textgreater}%
+}
+\setbeamertemplate{footline}{%
+  \hbox{\begin{beamercolorbox}[wd=\paperwidth,ht=1.6ex,dp=0.4ex,
+      leftskip=1.4ex,rightskip=1.4ex]{}%
+    % the frame number doubles as the one link back to the start, since
+    % the navigation symbols are switched off above
+    \navcluster\hfill\tiny\hyperlink{titleslide}{%
+      \insertframenumber\,/\,\inserttotalframenumber}
+  \end{beamercolorbox}}%
+  \nointerlineskip
+  % the pale bar is laid down at full width and the red one drawn over it,
+  % rather than subtracting the two: the difference leaves a sub-point
+  % sliver whenever the slide count does not divide the page width evenly
+  \hbox to\paperwidth{%
+    \rlap{{\color{bandpink}\rule{\paperwidth}{1.2pt}}}%
+    {\color{structure}\rule{\dimexpr\paperwidth
+      /\inserttotalframenumber*\insertframenumber\relax}{1.2pt}}%
+    \hfill
+  }%
+}
+\setbeamerfont{frametitle}{series=\bfseries}
+\setbeamertemplate{itemize item}{--}
+\setbeamertemplate{itemize subitem}{$\cdot$}
+
+\usepackage{amsmath,amssymb,bm}
+\usepackage{graphicx}
+\usepackage[T1]{fontenc}
+
+% Real Arial, which needs xelatex or lualatex; build with
+%   latexmk -xelatex presentation.tex
+% Maths stays in Latin Modern, as the reference deck also pairs Arial text
+% with a serif maths font.
+\usepackage{fontspec}
+\setsansfont{Arial}
+\renewcommand{\familydefault}{\sfdefault}
+\usefonttheme{professionalfonts}
+
+% The pink and red palette, sampled from
+% 2026-08-29_10min_biophys_ML.pdf: a pale band behind the title, brick red
+% for the title itself, brighter red for the current section.
+\definecolor{bandpink}{RGB}{252,213,213}
+\definecolor{deepred}{RGB}{168,48,36}
+\definecolor{brightred}{RGB}{192,12,24}
+\definecolor{mutedpink}{RGB}{226,150,150}
+
+\setbeamercolor{structure}{fg=deepred}
+\setbeamercolor{frametitle}{fg=deepred,bg=bandpink}
+\setbeamercolor{title}{fg=deepred}
+\setbeamercolor{subtitle}{fg=black}
+\setbeamerfont{title}{size=\Huge,series=\mdseries}
+\setbeamerfont{subtitle}{size=\large,series=\mdseries}
+\setbeamercolor{normal text}{fg=black}
+\setbeamercolor{palette primary}{fg=brightred,bg=bandpink}
+\setbeamercolor{palette secondary}{fg=mutedpink,bg=bandpink!45}
+\setbeamercolor{palette tertiary}{fg=mutedpink,bg=bandpink!45}
+\setbeamercolor{section in head/foot}{fg=brightred,bg=bandpink}
+\setbeamercolor{section in head/foot shaded}{fg=mutedpink,bg=bandpink!40}
+\setbeamercolor{mini frame}{fg=brightred,bg=bandpink}
+\setbeamercolor{item}{fg=deepred}
+% a full-width band behind the title, as in the reference
+\setbeamertemplate{frametitle}{%
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\paperwidth,ht=3.1ex,dp=1.3ex,
+      leftskip=1.6ex,rightskip=1.6ex]{frametitle}%
+    \centering\usebeamerfont{frametitle}\insertframetitle%
+  \end{beamercolorbox}%
+}
+
+\newcommand{\Q}{\bm{Q}}
+\newcommand{\pib}{\bm{\pi}}
+\newcommand{\koff}{k_{\mathrm{off}}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+\title{StatesAndRates}
+\subtitle{Graphs of states connected by rates, and the linear algebra that
+solves them}
+\date{}
+
+\begin{document}
+
+% the title page gets a filled canvas, as in the reference deck
+{
+\setbeamercolor{background canvas}{bg=bandpink}
+% not [plain]: that would drop the footline too, and with it the arrows.
+% Suppressing only the headline keeps them where they are on every other
+% slide, and keeps the section dots off the title. The head area is not
+% covered by the background canvas, so an empty headline shows the paper
+% through; it is filled here instead of left blank.
+{\setbeamertemplate{headline}{\vbox to 0pt{\vss
+    \hbox to\paperwidth{\color{bandpink}\rule{\paperwidth}{16pt}}}}
+\begin{frame}
+  \hypertarget{titleslide}{}%
+  \vfill
+  \begin{center}
+    {\usebeamerfont{title}\usebeamercolor[fg]{title}\inserttitle\par}
+    \vspace{1.0em}
+    \begin{minipage}{0.9\textwidth}
+      \centering\usebeamerfont{subtitle}\insertsubtitle\par
+    \end{minipage}
+    \vspace{2.2em}
+
+    \begin{minipage}{0.72\textwidth}
+      \centering\small
+      A small package for building a kinetic mechanism once and asking it
+      every question: equilibrium, relaxation, coarse graining, passage
+      times, dwell times, single molecules.
+    \end{minipage}
+
+    \vspace{1.8em}
+    {\small\url{https://github.com/lanmelo/StatesAndRates}}
+
+  \end{center}
+  \vfill
+\end{frame}
+}
+}
+
+\begin{frame}{A mechanism is a hypothesis}
+  Not a summary of data --- a \textbf{claim}: which states exist, which
+  interconvert, how fast.
+  \[
+    \underbrace{\text{states, arrows, rates}}_{\text{kinetic scheme}}
+    \;\;\longleftrightarrow\;\;
+    \underbrace{\text{wells, barriers, free energies}}_{\text{energy diagram}}
+  \]
+  \begin{center}
+    \small one claim, drawn twice --- wherever detailed balance holds
+  \end{center}
+  \medskip
+  So it predicts things an experiment can contradict:
+  \begin{itemize}
+    \item is a dissociation curve one exponential or two, and with what
+      amplitudes?
+    \item does a substitution move a well or a barrier --- association, or
+      retention?
+    \item what does an assay that cannot resolve the intermediate report as
+      ``the'' off-rate?
+    \item how often is an escape recaptured before it counts as one?
+  \end{itemize}
+  \medskip
+  \begin{center}
+    \textbf{Each is one operation on one matrix.}
+  \end{center}
+  \note{Whether the landscape exists at all is one more prediction ---
+  section 2 asks when detailed balance holds. The four questions are the
+  four middle sections of this deck. The package is those operations, so
+  that the mechanism is the only thing written down by hand.}
+\end{frame}
+
+\section[Diagrams]{From diagrams to matrices}
+
+\begin{frame}{The one object}
+  A \code{Graph} is a set of states and the first-order rate constants
+  between them. Everything else is a function of it.
+  \begin{center}
+    \includegraphics[width=0.92\textwidth]{figures/scheme.pdf}
+  \end{center}
+  \vspace{-0.6em}
+  Rate constants are stored as \textbf{logarithms}, for three reasons:
+  \begin{itemize}
+    \item they span many orders of magnitude ($10^{-3}$ to $10^{2}\
+      \mathrm{s^{-1}}$ here);
+    \item a free-energy perturbation is then an \emph{additive} shift;
+    \item an absent transition is $-\infty$, so structure and values live in
+      one array.
+  \end{itemize}
+  A \code{Scheme} is the same topology with the rates \emph{named} rather
+  than valued --- the mechanism before any numbers.
+\end{frame}
+
+\begin{frame}{From arrows to a matrix}
+  A rate constant $k_{i\to j}$ is a \textbf{probability per unit time}: in a
+  short interval $\mathrm{d}t$, a molecule in state $i$ moves to $j$ with
+  probability $k_{i\to j}\,\mathrm{d}t$, regardless of how long it has
+  already been in $i$.
+
+  That single memoryless assumption fixes everything else:
+  \begin{itemize}
+    \item the time spent in $i$ before \emph{any} jump is exponentially
+      distributed with rate $\sum_j k_{i\to j}$ --- the \emph{total} rate
+      out;
+    \item the destination is then chosen with probability
+      $k_{i\to j}\big/\sum_{j'} k_{i\to j'}$, independently of the waiting
+      time.
+  \end{itemize}
+  That is all ``continuous-time Markov chain'' means here. Nothing below
+  needs more probability theory than this --- the rest is linear algebra on
+  the matrix the diagram already is:
+  \[
+    \text{one arrow } i\to j
+    \;\;\longleftrightarrow\;\;
+    \text{one off-diagonal entry } k_{i\to j},
+  \]
+  with the diagonal fixed by bookkeeping, as the generator slide sets out.
+\end{frame}
+
+\begin{frame}{What first order buys, and what it costs}
+  \textbf{Buys:} every rate is a constant, so the master equation on the
+  next slide is \emph{linear}. That is what makes every question in this
+  talk one operation on one matrix, with no time stepping and no iteration.
+
+  \smallskip
+  \textbf{Costs:} association is bimolecular --- a protein and a site have
+  to find each other --- so it must enter as a \textbf{pseudo-first-order}
+  rate with the concentration folded in:
+  \[
+    k_{\mathrm{on,max}}\ [\mathrm{s^{-1}}]
+      \;=\; k^{(2)}_{\mathrm{on}}\ [\mathrm{M^{-1}s^{-1}}]
+      \times [\mathrm{X}] .
+  \]
+  \begin{itemize}
+    \item So every result belongs to \emph{that} concentration, not to a
+      standard state. Free energies come out as $\Delta G$, not
+      $\Delta G^\circ$.
+    \item $k_{\mathrm{d}}$ is unaffected by concentration; $k_{\mathrm{a}}$
+      scales with it. That asymmetry is why measured off-rates transfer
+      between experiments and on-rates do not.
+    \item Valid while the free pool is \emph{buffered},
+      $[\mathrm{X}]\gg[\text{sites}]$. Depletion, competition and titration
+      need a genuinely bimolecular treatment.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Notation, once}
+  \begin{itemize}
+    \item $\bm{p}(t)$ --- the \textbf{state vector}. Entry $p_i(t)$ is how
+      much is in state $i$ at time $t$: a probability for one molecule, or a
+      population for many. Either way the total is conserved, and it is what
+      every time course in this talk plots.
+    \item $\pib$ --- the \textbf{equilibrium distribution}: the
+      $\bm{p}$ that has stopped changing. Entry $\pi_i$ is the
+      equilibrium population of state $i$. Bold is the whole vector and a
+      subscript picks out one entry, here and throughout: $\bm{p}$ and
+      $p_i$, $\bm{K}$ and $K_{ij}$.
+    \item $\bm{K}$ --- the \textbf{rate matrix} read straight off the
+      diagram: $K_{ij}=k_{i\to j}$ off the diagonal, $K_{ii}=0$.
+    \item $\bm{1}$ --- the \textbf{all-ones vector}. So $\bm{K}\bm{1}$ is the
+      vector of \emph{row sums}, whose $i$th entry
+      $\sum_j k_{i\to j}$ is the total rate out of state $i$ --- the
+      quantity that already appeared as the exit rate on the last slide.
+    \item $\mathrm{diag}(\bm{v})$ --- the matrix with $\bm{v}$ down its
+      diagonal and zeros elsewhere.
+  \end{itemize}
+  \vspace{0.4em}
+  Multiplying by $\bm{1}$ is the recurring trick: it sums along rows.
+  ``$\bm{Q}\bm{1}=\bm{0}$'' will mean ``every row of $\bm{Q}$ sums to
+  zero'', and the $-\bm{1}$ in the passage-time solve later is the constant
+  on the right of one equation per state.
+\end{frame}
+
+\begin{frame}{The generator}
+  Take the rate matrix and put minus each row's own sum on its diagonal:
+  \[
+    \Q = \bm{K} - \mathrm{diag}(\bm{K}\bm{1}),
+    \qquad
+    Q_{ij} = k_{i\to j}\ (i\neq j),
+    \qquad
+    Q_{ii} = -\sum_{j\neq i} k_{i\to j}.
+  \]
+  For the searching/testing/bound chain of slide~2, that is
+  \[
+    \Q =
+    \begin{pmatrix}
+      -k_{\mathrm{on,max}} & k_{\mathrm{on,max}} & 0\\[2pt]
+      k_{\mathrm{off,M}} & -(k_{\mathrm{off,M}}+k_{\mathrm{on},\mu})
+        & k_{\mathrm{on},\mu}\\[2pt]
+      0 & k_{\mathrm{off},\mu} & -k_{\mathrm{off},\mu}
+    \end{pmatrix} .
+  \]
+  \begin{itemize}
+    \item Off-diagonal entries are the arrows. Zeros are the arrows that do
+      not exist --- here searching and bound do not interconvert directly.
+    \item Each diagonal entry is minus the rest of its row, so
+      $\Q\bm{1}=\bm{0}$: \textbf{every row sums to zero}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{The master equation}
+  Count what flows into a state and what flows out of it:
+  \vspace{-0.4em}
+  \[
+    \frac{\mathrm{d}p_i}{\mathrm{d}t}
+      = \underbrace{\sum_{j\neq i} k_{j\to i}\,p_j}_{
+        \substack{\text{arriving from}\\ \text{every other state}}}
+      - \underbrace{p_i\sum_{j\neq i} k_{i\to j}}_{
+        \substack{\text{leaving }i\text{ by}\\ \text{every route out}}}
+  \]
+  That is the $i$th column of $\Q$ acting on $\bm{p}$, so the whole system
+  is one matrix equation:
+  \[
+    \frac{\mathrm{d}\bm{p}}{\mathrm{d}t} = \Q^{\!\top}\bm{p} .
+  \]
+  \begin{itemize}
+    \item The transpose is there because $Q_{ij}$ is the rate \emph{out of}
+      $i$, while $\mathrm{d}p_i/\mathrm{d}t$ needs the rates \emph{into} it.
+    \item Zero row sums make $\Q$ \textbf{singular} --- that is
+      conservation, $\bm{1}^{\!\top}\mathrm{d}\bm{p}/\mathrm{d}t=0$.
+    \item Everything from here is one linear-algebra question about $\Q$:
+      a null vector, a matrix exponential, an eigenproblem, or a linear
+      solve --- which one depends on what the experiment measures.
+  \end{itemize}
+\end{frame}
+
+\section[Thermodynamics]{Thermodynamics}
+
+\begin{frame}{Detailed balance: when do free energies exist?}
+  Detailed balance is the statement that every transition is individually
+  balanced at equilibrium,
+  \[
+    \pi_i\,k_{i\to j} = \pi_j\,k_{j\to i}
+    \quad\Longleftrightarrow\quad
+    \ln\frac{\pi_j}{\pi_i} = \ln\frac{k_{i\to j}}{k_{j\to i}} .
+  \]
+  Summing that around any cycle must give zero --- \textbf{Kolmogorov's
+  criterion}. A graph that violates it is being driven and has no
+  free-energy landscape.
+
+  \textbf{How it is tested.} Not by enumerating cycles. Walk a spanning
+  tree, accumulating $\ln\pi$ from the ratios; that fixes $\ln\pi$ up to a
+  constant using $n-1$ of the transitions. Then the residual
+  \[
+    r_{ij} = \ln\pi_j - \ln\pi_i - \ln\frac{k_{i\to j}}{k_{j\to i}}
+  \]
+  must vanish on \emph{every remaining} transition. One tree walk,
+  $O(n^2)$, no cycle basis.
+\end{frame}
+
+\begin{frame}{Equilibrium: a null vector, computed carefully}
+  The equilibrium distribution is the stationary solution,
+  \[
+    \Q^{\!\top}\pib = \bm{0},
+    \qquad \textstyle\sum_i \pi_i = 1 .
+  \]
+  $\Q$ is singular by construction, so forming this as a least-squares or
+  nullspace problem invites catastrophic cancellation: the diagonal is a sum
+  of the off-diagonals, and subtracting nearly equal large numbers destroys
+  the small ones.
+
+  \textbf{GTH reduction} instead eliminates one state at a time using
+  \emph{only the non-negative off-diagonal rates}:
+  \[
+    Q_{ik} \leftarrow \frac{Q_{ik}}{\sum_{j<k} Q_{kj}},
+    \qquad
+    Q_{ij} \leftarrow Q_{ij} + Q_{ik}Q_{kj}
+    \quad (i,j<k),
+  \]
+  then back-substitutes $w_k = \sum_{i<k} w_i Q_{ik}$ from $w_0=1$ and
+  normalises. No subtraction ever occurs, so the result is accurate even
+  when populations differ by many orders of magnitude.
+\end{frame}
+
+\begin{frame}{Free energies and energy diagrams}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      From the equilibrium distribution,
+      \[ G_i = -RT\ln\pi_i , \]
+      and from transition-state theory, writing
+      $k_{i\to j} = A\,e^{-(G^\ddag_{ij}-G_i)/RT}$,
+      \[ G^\ddag_{ij} = G_i - RT\ln\frac{k_{i\to j}}{A} . \]
+      \begin{itemize}
+        \item Both directions must give the \emph{same} barrier, which is
+          detailed balance --- so the package refuses without it. The
+          prefactor $A$ shifts every barrier equally, leaving all
+          \emph{differences} unchanged.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \includegraphics[width=0.78\textwidth]{figures/energy.pdf}
+      \vspace{-0.7em}
+      \begin{center}\scriptsize
+        Same $k_{\mathrm{off},\mu}$, so the same well depth from the
+        barrier; different recognition, different wells.
+
+        \smallskip
+        These are $\Delta G$, \emph{not} $\Delta G^\circ$: association
+        enters as $k_{\mathrm{on}}[\mathrm{TF}]$, so this is drawn at that
+        concentration. The standard-state shift is 12 kcal/mol.
+      \end{center}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Perturbations are additive in log space}
+  A \code{Mutation} is expressed in kcal/mol on the \emph{landscape}, not on
+  individual rates, and applied as $\ln k \leftarrow \ln k + \Delta$:
+  \[
+    \underbrace{\Delta_{ij} \mathrel{+}= \frac{\Delta G_i}{RT}
+      \ \ \forall j}_{\text{raise a well}}
+    \qquad
+    \underbrace{\Delta_{ij},\Delta_{ji} \mathrel{-}=
+      \frac{\Delta G^\ddag_{ij}}{RT}}_{\text{raise a barrier}}
+  \]
+  \begin{itemize}
+    \item Raising a well speeds up \emph{every} transition out of it ---
+      one row of the matrix.
+    \item Raising a barrier slows \emph{both} directions equally, so the
+      equilibrium constant is untouched. Either way the graph stays
+      thermodynamically consistent.
+    \item $-\infty + \text{finite} = -\infty$: perturbing an absent
+      transition does nothing, for free.
+    \item Mutations add with \code{+}, so a double mutant is the sum of two
+      single ones --- and that is testable against applying them in turn.
+  \end{itemize}
+\end{frame}
+
+\section[Kinetics]{Kinetics}
+
+\begin{frame}{Solving it: the matrix exponential}
+  $\mathrm{d}\bm{p}/\mathrm{d}t = \Q^{\!\top}\bm{p}$ is the matrix version of
+  $\dot{x}=ax$, and it has the same solution:
+  \[
+    \bm{p}(t) = e^{\Q^{\!\top} t}\,\bm{p}(0),
+    \qquad
+    e^{\bm{A}} \equiv \bm{I} + \bm{A} + \tfrac{1}{2}\bm{A}^2 + \dots
+  \]
+  So no time stepping is needed --- the answer at $t=10^{6}$ costs the same
+  as at $t=1$.
+
+  \textbf{But the series is not how you compute it.} Software squares a
+  scaled exponential repeatedly, and each squaring doubles any error
+  already present. That becomes visible once the largest rate times the
+  longest time exceeds roughly $10^{9}$.
+
+  \smallskip
+  Master equations hit that constantly, because they are \textbf{stiff}
+  whenever the timescales are well separated --- and well-separated
+  timescales are usually the point. In the model here the fast mode is
+  $10^{4}$ times the slow one, so following the slow relaxation means
+  carrying the fast one for $10^{4}$ of its own lifetimes.
+
+  \smallskip
+  When the graph is reversible there is a way out that costs nothing.
+\end{frame}
+
+\begin{frame}{Solving it exactly: symmetrise first}
+  $\Q$ is not symmetric, so its eigenvectors are not orthogonal and
+  diagonalising it is ill-conditioned. Detailed balance repairs that.
+  Conjugate by the square root of the equilibrium distribution,
+  $\bm{\Pi}=\mathrm{diag}(\pib)$:
+  \[
+    \bm{S} = \bm{\Pi}^{1/2}\,\Q\,\bm{\Pi}^{-1/2},
+    \qquad
+    S_{ij} = \sqrt{\frac{\pi_i}{\pi_j}}\,k_{i\to j} .
+  \]
+  Now use $\pi_i k_{i\to j} = \pi_j k_{j\to i}$, which gives
+  $\pi_i/\pi_j = k_{j\to i}/k_{i\to j}$:
+  \[
+    S_{ij} = \sqrt{\frac{k_{j\to i}}{k_{i\to j}}}\;k_{i\to j}
+      = \sqrt{k_{i\to j}\,k_{j\to i}} \;=\; S_{ji}.
+  \]
+  \begin{itemize}
+    \item \textbf{$\pib$ cancels.} The symmetrised matrix is just the
+      geometric mean of each forward and reverse rate --- no equilibrium
+      calculation needed to build it.
+    \item It is symmetric, so \code{eigh} gives a real spectrum and genuinely
+      orthogonal modes, at any stiffness.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Solving it exactly: putting it back}
+  Conjugation does not change eigenvalues, so $\bm{S}$ and $\Q$ have the
+  same spectrum. Diagonalise the easy one, $\bm{S}=\bm{V}\bm{\Lambda}
+  \bm{V}^{\!\top}$, and undo the conjugation:
+  \[
+    \bm{p}(t) = \bm{\Pi}^{1/2}\,\bm{V}\,e^{\bm{\Lambda}t}\,
+      \bm{V}^{\!\top}\,\bm{\Pi}^{-1/2}\,\bm{p}(0) .
+  \]
+  Read right to left, that is four steps: weight the start by
+  $\bm{\Pi}^{-1/2}$, project onto the modes, decay each mode by its own
+  $e^{\lambda t}$, then transform back.
+  \begin{itemize}
+    \item $e^{\bm{\Lambda}t}$ is diagonal --- one scalar exponential per
+      mode --- so nothing is squared and nothing amplifies. It is exact
+      however stiff the rates and however long the time.
+    \item The cost is one eigendecomposition, reused for every requested
+      time.
+    \item Only the eigenvalues are needed if all you want is the
+      \emph{rates} of the phases, which is the next slide.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{The relaxation spectrum}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}\small
+      The eigenvalues of $-\bm{S}$ are the relaxation rates:
+      \[
+        0 = \lambda_0 < \lambda_1 \le \dots \le \lambda_{n-1},
+      \]
+      $\lambda_0$ belonging to equilibrium and the rest being the rates of
+      the exponential phases of \emph{any} relaxation. Their reciprocals are
+      the relaxation times. For this chain,
+      $\lambda_\pm = \tfrac{1}{2}\bigl(T \pm \sqrt{T^2-4D}\bigr)$,
+      with $T=\sum_i k_i$ and
+      $D = k_{\mathrm{off,M}}k_{\mathrm{off},\mu}
+      + k_{\mathrm{off},\mu}k_{\mathrm{on,max}}
+      + k_{\mathrm{on,max}}k_{\mathrm{on},\mu}$.
+      \begin{itemize}
+        \item A three-state chain has two non-zero modes, but here they are
+          $10^{4}$ apart, so the slow one is all an experiment sees.
+        \item That is why the population curve is indistinguishable from a
+          single exponential with rate $k_{\mathrm{a}}+k_{\mathrm{d}}$ ---
+          and it is the justification for coarse graining.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \includegraphics[width=\textwidth]{figures/relaxation.pdf}
+      \vspace{-0.4em}
+      \begin{center}\small
+        Populations from $\code{propagate}$; dashed is one exponential at
+        $1/(k_{\mathrm{a}}+k_{\mathrm{d}})$.
+      \end{center}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Absorbing states: the dissociation experiment}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      Setting one column of the rates to $-\infty$ in log space makes a
+      state \textbf{absorbing}. Nothing rebinds, so the population only
+      drains out of it.
+      \begin{itemize}
+        \item That is a wash step: protein removed from solution.
+        \item The graph is no longer reversible, so \code{propagate} falls
+          back to the matrix exponential --- correctly, since detailed
+          balance no longer holds.
+        \item Survival curves, and therefore measured off-rates, are
+          exactly this calculation.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \includegraphics[width=\textwidth]{figures/washout.pdf}
+      \vspace{-0.4em}
+      \begin{center}\small
+        Association, then the searching state made absorbing at
+        $t=2000\,$s.
+      \end{center}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\section[Coarse graining]{What an experiment resolves}
+
+\begin{frame}{Coarse graining: two different reductions}
+  An experiment rarely resolves every state. Lumping states
+  $\mathcal{A},\mathcal{B},\dots$ gives a graph over macrostates --- but
+  there is more than one right answer, because the answer depends on what
+  the instrument measures.
+
+  \textbf{Local-equilibrium average} (\code{coarse\_grain}):
+  \[
+    K_{\mathcal{A}\mathcal{B}}
+      = \sum_{i\in\mathcal{A}} w_i \sum_{j\in\mathcal{B}} k_{i\to j},
+    \qquad
+    w_i = \frac{\pi_i}{\sum_{i'\in\mathcal{A}}\pi_{i'}} .
+  \]
+  Reproduces the equilibrium populations and the equilibrium \emph{fluxes}
+  exactly.
+
+  \textbf{Passage-time inverse} (\code{passage\_rates}):
+  \[
+    K_{\mathcal{A}\mathcal{B}}
+      = \Big(\sum_{i\in\mathcal{A}} w_i\, m_i(\mathcal{B})\Big)^{-1},
+  \]
+  the reciprocal of a mean first passage time. This is the rate a measured
+  \emph{dwell time} reports.
+
+  \smallskip
+  They agree only when the partition is \textbf{lumpable}: every state of
+  $\mathcal{A}$ has the same total rate into $\mathcal{B}$. Then the macro
+  kinetics is genuinely Markovian.
+\end{frame}
+
+\begin{frame}{Mean first passage time: the first-step argument}
+  How long, on average, until the system first reaches a target set
+  $\mathcal{T}$? Let $m_i$ be that time starting from state $i$, with
+  $m_i=0$ for $i\in\mathcal{T}$.
+
+  Take one step and average. From $i$ you wait, then land somewhere:
+  \[
+    m_i \;=\;
+    \underbrace{\frac{1}{\sum_j k_{i\to j}}}_{\substack{\text{mean wait}\\
+      \text{in }i}}
+    \;+\;
+    \sum_j
+    \underbrace{\frac{k_{i\to j}}{\sum_{j'} k_{i\to j'}}}_{\substack{
+      \text{chance of}\\ \text{landing in }j}}
+    \;\underbrace{m_j}_{\substack{\text{time still}\\ \text{to go}}} .
+  \]
+  Multiply through by the total exit rate and move the $m$ terms to one
+  side. The waiting time and the branching probabilities recombine into the
+  generator, and every trace of probability disappears:
+  \[
+    \boxed{\;\sum_{j\notin\mathcal{T}} Q_{ij}\, m_j = -1\;}
+    \qquad (i\notin\mathcal{T}).
+  \]
+  One linear equation per non-target state, with the target states simply
+  absent --- they contribute nothing because $m_j=0$ there.
+\end{frame}
+
+\begin{frame}{Mean first passage time: the linear solve}
+  In matrix form, restricting to the non-target (``free'') states
+  $\mathcal{F}$:
+  \[
+    \Q_{\mathcal{F}\mathcal{F}}\,\bm{m}_{\mathcal{F}} = -\bm{1}
+    \qquad\Longrightarrow\qquad
+    \bm{m}_{\mathcal{F}} = -\,\Q_{\mathcal{F}\mathcal{F}}^{-1}\,\bm{1} .
+  \]
+  With $\mathcal{F}=\{\text{testing},\text{bound}\}$, this is slide~7's
+  matrix with the searching row and column struck out:
+  \vspace{-0.9em}
+  \[
+    \Q_{\mathcal{F}\mathcal{F}} = \left(\begin{smallmatrix}
+      -(k_{\mathrm{off,M}}+k_{\mathrm{on},\mu}) & k_{\mathrm{on},\mu}\\
+      k_{\mathrm{off},\mu} & -k_{\mathrm{off},\mu}
+    \end{smallmatrix}\right),
+    \qquad
+    \bm{m}_{\mathcal{F}} = \left(\begin{smallmatrix}
+      k_{\mathrm{off},\mu}+k_{\mathrm{on},\mu}\\
+      k_{\mathrm{off,M}}+k_{\mathrm{off},\mu}+k_{\mathrm{on},\mu}
+    \end{smallmatrix}\right)
+    \big/ k_{\mathrm{off,M}}k_{\mathrm{off},\mu} .
+  \]
+  \vspace{-0.9em}
+  \begin{itemize}
+    \item The full $\Q$ is singular, so this could not be solved as
+      written on all states. \textbf{Deleting the target rows and columns
+      is exactly what makes it invertible} --- the deleted rows are where
+      the probability leaks out.
+    \item $-\Q_{\mathcal{F}\mathcal{F}}^{-1}$ is the \textbf{fundamental
+      matrix}: its $(i,j)$ entry is the expected \emph{total time spent in
+      $j$} before absorption, starting from $i$. So $\bm{m}$ is just its
+      row sums, and $-\Q_{\mathcal{F}\mathcal{F}}^{-1}\bm{1}$ says
+      ``add up the time spent everywhere''.
+    \item One solve, $O(n^3)$, gives the passage time from \emph{every}
+      state at once --- not one target at a time.
+    \item Everything downstream is this one inverse: the macroscopic rates
+      of the next slide, and the observable dwell times later.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{The same inverse, read two ways}
+  The first-step argument gets to
+  $\bm{m}=-\Q_{\mathcal{F}\mathcal{F}}^{-1}\bm{1}$ through probabilities.
+  There is a route with no probability in it at all.
+
+  The chance of still being free at time $t$, having started in $i$, is
+  $\Phi_i(t)=\sum_{j\in\mathcal{F}}\big(e^{\Q_{\mathcal{F}\mathcal{F}}^{\!\top}t}
+  \big)_{ji}$, and a mean lifetime is the integral of a survival curve:
+  \[
+    m_i = \int_0^\infty \Phi_i(t)\,\mathrm{d}t ,
+    \qquad
+    \int_0^\infty e^{\Q_{\mathcal{F}\mathcal{F}}t}\,\mathrm{d}t
+      = -\,\Q_{\mathcal{F}\mathcal{F}}^{-1} ,
+  \]
+  the matrix analogue of $\int_0^\infty e^{-at}\mathrm{d}t = 1/a$. It
+  converges precisely because absorption makes every eigenvalue negative.
+
+  \smallskip
+  So the fundamental matrix is the \textbf{time-integrated propagator}: its
+  $(i,j)$ entry is the total time spent in $j$, the \emph{mean residence
+  time}, and the passage time is the sum over $j$. That is the derivation in
+  Bar-Haim \& Klafter, \emph{J.\ Chem.\ Phys.}\ \textbf{109}, 5187 (1998).
+
+  \smallskip
+  Both are available: \code{mean\_first\_passage\_times} for the totals in
+  one solve, \code{mean\_residence\_times} for the matrix. Divide an entry
+  by the mean time per visit and it becomes a \emph{visit count} ---
+  $1/(1-p_{\mathrm{tot}})$ bound visits per escape, exactly.
+\end{frame}
+
+\begin{frame}{Recovering the macroscopic rates}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      For Marklund's model, lumping the invisible testing state and taking
+      passage times between searching and bound reproduces the paper's
+      Eq.~1 exactly:
+      \[
+        k_{\mathrm{a}} = k_{\mathrm{on,max}}\,p_{\mathrm{tot}},
+        \qquad
+        k_{\mathrm{d}} = k_{\mathrm{off},\mu}\,(1-p_{\mathrm{tot}}),
+      \]
+      with $p_{\mathrm{tot}} = k_{\mathrm{on},\mu}/
+      (k_{\mathrm{on},\mu}+k_{\mathrm{off,M}})$ the recapture probability.
+      \begin{itemize}
+        \item No fitting, and no symbolic algebra either --- the package
+          has none. This is the linear solve, which \emph{agrees} with
+          Eq.~1 rather than deriving it.
+        \item The three operators differ only in $p_{\mathrm{tot}}$, and
+          they land on the predicted curve.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \includegraphics[width=\textwidth]{figures/macro.pdf}
+      \vspace{-0.4em}
+      \begin{center}\small
+        Line: Eq.~1 swept over $p_{\mathrm{tot}}$. Points: the three
+        operators, from passage times.
+      \end{center}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Splitting the passage time recovers Eq.~1 --- and its limits}
+  \begin{center}
+    \includegraphics[width=0.88\textwidth]{figures/residence.pdf}
+  \end{center}
+  \vspace{-0.8em}
+  The residence matrix splits it:
+  $m_{\mathrm{b}}
+    = \underbrace{R_{\mathrm{bb}}}_{1/k_{\mathrm{d}}}
+    + \underbrace{R_{\mathrm{bt}}}_{1/k_{\mathrm{off,M}}}$.
+  There are $1/(1-p_{\mathrm{tot}})$ visits to bound, each lasting
+  $1/k_{\mathrm{off},\mu}$, so their product is Marklund's
+  $1/k_{\mathrm{d}}$ \textbf{exactly}. Testing is visited as often, but each
+  visit lasts $1/(k_{\mathrm{on},\mu}+k_{\mathrm{off,M}})$ and the factors
+  cancel, leaving one intermediate lifetime. So $1/\mathrm{MFPT}$ is Eq.~1
+  only when that lifetime is short: the error is exactly $r/(1+r)$ with
+  $r = k_{\mathrm{d}}/k_{\mathrm{off,M}}$.
+\end{frame}
+
+\section[Single molecules]{Single molecules}
+
+\begin{frame}{Why simulate at all?}
+  Everything so far computes what the population does \textbf{on average}.
+  $\bm{p}(t)$ is a distribution over states, not a molecule.
+
+  That is enough for a bulk time course, an equilibrium constant, or a
+  relaxation rate. It is not enough when the observable is something the
+  mean does not determine:
+  \begin{itemize}
+    \item the \emph{distribution} of dwell times, not just its mean --- is
+      it one exponential or two?
+    \item how many times a molecule revisits a state before it escapes;
+    \item what a single-molecule trace looks like, which is what a
+      microscope records;
+    \item any statistic of a trajectory: waiting-time correlations, first
+      passages beyond the mean, rare excursions.
+  \end{itemize}
+  A trajectory is one realisation of the \emph{same} generator. Nothing new
+  is assumed --- and averaging many of them must reproduce
+  \code{propagate}, which is a useful check on both.
+\end{frame}
+
+\begin{frame}{One step of the simulation}
+  Every transition is first order, so molecules never interact: each is an
+  independent copy of the same process and they advance together. Simulating 200 means 200 \emph{independent} copies, not
+  200 molecules competing for one site.
+
+  In state $i$, ask each outgoing arrow when it would fire:
+  \vspace{-0.3em}
+  \[
+    \tau_{i\to j} = \frac{E_j}{k_{i\to j}},
+    \qquad E_j \sim \mathrm{Exp}(1)\ \text{drawn independently},
+  \]
+  an exponential waiting time of rate $k_{i\to j}$, which is what that
+  rate constant means. Then take the \textbf{first} arrow to fire:
+  \[
+    j^\star = \arg\min_j \tau_{i\to j},
+    \qquad
+    t \leftarrow t + \min_j \tau_{i\to j},
+    \qquad
+    i \leftarrow j^\star .
+  \]
+  Repeat --- hence \emph{first-reaction} method.
+
+  \smallskip
+  \textbf{The method is not the restriction.} Gillespie's algorithm is exact
+  for any well-mixed mass-action network, bimolecular included: for
+  $\mathrm{A}+\mathrm{B}\to\mathrm{C}$ the propensity is $c\,N_A N_B$,
+  recomputed from the current counts each step. It is \emph{this package}
+  that is first order, which is what lets it track independent molecules on
+  a fixed graph rather than a vector of counts.
+\end{frame}
+
+\begin{frame}{Why that is the right answer}
+  Two facts make the shortcut legitimate:
+  \begin{itemize}
+    \item the minimum of independent exponentials is exponential with the
+      \emph{summed} rate, $\min_j \tau_{i\to j}\sim
+      \mathrm{Exp}\!\big(\sum_j k_{i\to j}\big)$ --- which is the exit time
+      the memoryless assumption demanded;
+    \item the probability that arrow $j$ is the one that fires first is
+      $k_{i\to j}\big/\sum_{j'} k_{i\to j'}$ --- which is the branching
+      probability.
+  \end{itemize}
+  So drawing a race between the arrows reproduces ``sample the exit time,
+  then choose a destination'' without ever writing those two steps
+  separately.
+
+  \smallskip
+  \textbf{Done in log space.} $\ln\tau_{i\to j} = \ln E_j - \ln k_{i\to j}$,
+  and the rates are already stored as logarithms. Rates spanning many orders
+  of magnitude therefore cost no accuracy, and an absent transition is
+  $\ln k = -\infty$, giving $\tau=+\infty$ rather than a division by zero.
+
+  \smallskip
+  An \textbf{absorbing} state has no finite $\tau$ at all, so the molecule
+  simply stops --- no special case needed.
+\end{frame}
+
+\begin{frame}{What a single molecule looks like}
+  \begin{center}
+    \includegraphics[width=0.62\textwidth]{figures/gillespie.pdf}
+  \end{center}
+  \vspace{-0.4em}
+  \begin{itemize}
+    \item Same mechanism, two operators. Osym sits bound; O2 keeps
+      returning to the search.
+    \item The trajectory carries every jump, so occupancy at arbitrary
+      times is a \code{searchsorted} plus a cumulative sum --- no
+      re-simulation.
+    \item The check on all the matrix algebra: the ensemble average of
+      many trajectories reproduces \code{propagate}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{The ensemble average is the master equation}
+  \begin{columns}[T]
+    \begin{column}{0.54\textwidth}
+      \includegraphics[width=\textwidth]{figures/aggregate.pdf}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \small Solid: 200 molecules through \code{occupancy}; dashed:
+      \code{propagate} on the same graph.
+      \begin{itemize}
+        \item This is the one place the two halves of the package have to
+          agree, and they share no code: NumPy sampling of waiting times
+          against a JAX eigendecomposition.
+        \item The residual is sampling noise, not bias: rms $0.026$
+          against the binomial $1/\sqrt{N}=0.071$, and it shrinks with
+          more molecules, not with a finer grid.
+        \item One molecule at a time and a whole population measure the
+          same object; which to run is a question about noise.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Dwell times: two rates, and they are not the same}
+  A dwell in one state can report either of two rates.
+
+  \textbf{Per visit} --- arrival until the next jump out, whatever the
+  destination:
+  \[
+    \text{exponential with}\quad k_{\text{micro}} = \sum_j k_{i\to j} .
+  \]
+  \textbf{Until it actually leaves} --- arrival until first reaching a
+  target, so excursions that come straight back \emph{do not} end the dwell:
+  \[
+    k_{\text{obs}} = 1/m_i(\mathcal{T}) .
+  \]
+  \begin{itemize}
+    \item The second is always slower, by one over the probability that an
+      escape is \emph{not} recaptured.
+    \item Which one an experiment measures depends on whether it can see the
+      excursion. If the intermediate is invisible, it measures the passage
+      time --- so the microscopic rate is not what a dwell histogram gives.
+    \item This is the microscopic/macroscopic distinction, in one state.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Dwells, sampled and predicted}
+  \begin{center}
+    \includegraphics[width=0.5\textwidth]{figures/dwells.pdf}
+  \end{center}
+  \vspace{-0.6em}
+  \begin{itemize}
+    \item Histogram: Osym dwells extracted from a Gillespie run. Lines:
+      $k\,e^{-kt}$ at the two rates above, computed from the graph, not
+      fitted to the sample.
+    \item The sample follows the \emph{observable} rate, not the
+      microscopic one --- $1/k_{\mathrm{off},\mu}=167\,$s against a measured
+      mean of $\sim\!1100\,$s for Osym.
+    \item Dwells still running at the end are dropped, pulling the
+      sample mean slightly low.
+  \end{itemize}
+\end{frame}
+
+\section[Driven, differentiable]{Beyond closed form}
+
+\begin{frame}{Time-dependent rates, and derivatives}
+  \textbf{When the rates move.} A ligand jump, a flow ramp, a wash with
+  finite mixing: then $\Q=\Q(t)$ and there is no closed form. The package
+  integrates
+  \[
+    \frac{\mathrm{d}\bm{p}}{\mathrm{d}t} = \Q(t)^{\!\top}\bm{p}
+  \]
+  with an implicit solver (Kvaerno5), because master equations are stiff
+  whenever their timescales are well separated --- which is whenever the
+  problem is interesting.
+
+  \textbf{Why it is all differentiable.} A graph is registered as a JAX
+  pytree whose \emph{only} leaf is the log-rate matrix; the state names and
+  temperature are static metadata. So
+  \[
+    \frac{\partial}{\partial \ln k_{i\to j}}
+      \big(\text{any observable}\big)
+  \]
+  comes from \code{jax.grad}, and a library of variants is one
+  \code{jax.vmap}. Fitting a mechanism to data is then the same machinery as
+  evaluating it.
+\end{frame}
+
+\begin{frame}{Everything above, as matrix algebra}
+  \small
+  One operator, two directions. \textbf{Forward} questions act on a
+  distribution and need the rates \emph{into} a state, so they carry
+  $\Q^{\!\top}$; \textbf{backward} questions act on a function of where you
+  \emph{started} and need the rates \emph{out}, so they carry $\Q$, with the
+  target's rows and columns deleted.
+
+  \vspace{0.1em}
+  {\renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{@{}lllll@{}}
+    & \textbf{Unknown} & \textbf{Equation} & \textbf{Name}
+      & \textbf{What is measured}\\[2pt]
+    \hline\\[-6pt]
+    \textbf{Forward}
+      & $\bm{\pi}$ & $\Q^{\!\top}\bm{\pi}=\bm{0}$,\;
+        $\bm{1}^{\!\top}\bm{\pi}=1$ & stationary distribution
+        & occupancy, $K_{\mathrm{d}}$, $\Delta G$\\
+      & $\bm{p}(t)$ & $\bm{p}(t)=e^{\Q^{\!\top}t}\bm{p}(0)$ & propagation
+        & a kinetic trace\\
+      & $\bm{J}$ & $J_{ij}=\pi_i k_{i\to j}-\pi_j k_{j\to i}$
+        & stationary flux & turnover, dissipation\\[3pt]
+    \textbf{Backward}
+      & $\bm{N}$ & $\Q_{\mathcal{F}\mathcal{F}}\bm{N}=-\bm{I}$
+        & fundamental matrix & where the time goes\\
+      & $\bm{m}$ & $\Q_{\mathcal{F}\mathcal{F}}\bm{m}=-\bm{1}$,\;
+        $\bm{m}=\bm{N}\bm{1}$ & MFPT
+        & dwell time, $1/\koff$\\
+      & $\bm{H}$ & $\Q_{\mathcal{F}\mathcal{F}}\bm{H}
+        =-\Q_{\mathcal{F}\mathcal{A}}$ & splitting probabilities
+        & branching ratio\\[3pt]
+    \textbf{Either} & $\lambda$ & $\Q\bm{v}=\lambda\bm{v}$
+      & relaxation spectrum & exponential phases\\
+  \end{tabular}}
+
+  \vspace{0.4em}
+  The two halves are one object read twice:
+  $-\Q_{\mathcal{F}\mathcal{F}}^{-1}
+    = \int_0^\infty e^{\Q_{\mathcal{F}\mathcal{F}}t}\,\mathrm{d}t$, and
+  $e^{\Q^{\!\top}t}\to\bm{\pi}\bm{1}^{\!\top}$ as $t\to\infty$. So a
+  backward solve is a forward propagation with the clock integrated out ---
+  no $t$ in it, and every starting state at once --- and equilibrium is
+  propagation at $t\to\infty$, only cheaper.
+\end{frame}
+
+\begin{frame}{The map}
+  \scriptsize
+  \begin{tabular}{@{}lll@{}}
+    \textbf{Question} & \textbf{Linear algebra} & \textbf{Entry point}\\[2pt]
+    \hline\\[-6pt]
+    Is there a landscape? & tree walk $+$ residual &
+      \code{is\_detailed\_balanced}\\
+    Equilibrium populations & null vector of $\Q^{\!\top}$, by GTH &
+      \code{equilibrium}\\
+    Free energies, barriers & $-RT\ln\pi$; $G_i-RT\ln(k/A)$ &
+      \code{free\_energies}, \code{barrier\_energies}\\
+    Perturb the landscape & additive shift of $\ln k$ &
+      \code{Mutation}, \code{Graph.mutate}\\
+    Populations over time & $e^{\Q^{\!\top}t}$, or $\bm{\Pi}^{1/2}$-conjugated
+      \code{eigh} & \code{propagate}\\
+    Observable phases & eigenvalues of $-\bm{S}$ &
+      \code{relaxation\_rates}, \code{\dots times}\\
+    Driven rates & implicit ODE solve & \code{integrate}\\
+    What a lumped experiment sees & flux average, or $1/$MFPT &
+      \code{coarse\_grain}, \code{passage\_rates}\\
+    Time to reach a state & $-\Q_{\mathcal{F}\mathcal{F}}^{-1}\bm{1}$ &
+      \code{mean\_first\_passage\_times}\\
+    Where that time is spent & $-\Q_{\mathcal{F}\mathcal{F}}^{-1}$ itself &
+      \code{mean\_residence\_times}\\
+    Is lumping legitimate? & equal row sums into each block &
+      \code{is\_lumpable}\\
+    Individual molecules & first-reaction sampling &
+      \code{simulate}\\
+    Dwell distributions & row sum vs.\ MFPT &
+      \code{Trajectory.dwells}, \code{dwell\_rates}\\
+    Draw it & --- & \code{state\_diagram}, \code{energy\_diagram}\\
+  \end{tabular}
+
+  \vspace{0.8em}
+  \normalsize
+  Build the mechanism once as a \code{Scheme}; fill it with numbers to get a
+  \code{Graph}; ask any of the above.
+\end{frame}
+
+\end{document}
